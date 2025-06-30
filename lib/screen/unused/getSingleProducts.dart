@@ -13,11 +13,11 @@ class GetSingleProducts extends StatefulWidget {
 
 class _GetSingleProductsState extends State<GetSingleProducts> {
   List<dynamic> singleProduct = [];
-  void getSingleProducts() async {
+  Future<void> getSingleProducts() async {
     final dio = Dio();
     try {
       final response = await dio.get("$base_api/products");
-      if (response.data == null && response.statusCode == null) {
+      if (response.statusCode == 200 && response.data != null) {
         setState(() {
           singleProduct = response.data;
         });
