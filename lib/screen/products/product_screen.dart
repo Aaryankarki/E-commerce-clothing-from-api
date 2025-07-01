@@ -1,101 +1,8 @@
 import 'package:ecommerce/Widget/reuse_product_card.dart';
-
 import 'package:ecommerce/model/product.dart';
-
 import 'package:ecommerce/services/api_helper.dart';
 import 'package:flutter/material.dart';
 
-// class HomePage extends StatefulWidget {
-//   const HomePage({super.key});
-
-//   @override
-//   State<HomePage> createState() => _HomePageState();
-// }
-
-// class _HomePageState extends State<HomePage> {
-//   List<Map<String, dynamic>> products = [];
-
-//   void onProduct() async {
-//     final dio = Dio();
-//     try {
-//       final response = await dio.get("$base_api/products");
-
-//       if (response.statusCode == 200 && response.data is List) {
-//         setState(() {
-//           products = List<Map<String, dynamic>>.from(response.data);
-//         });
-//       }
-
-//       log(response.data.toString());
-//     } catch (e) {
-//       log("Unsuccessful ${e.toString()}");
-//     }
-//   }
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     onProduct();
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(title: const Text("Products")),
-//       body:
-//           products.isEmpty
-//               ? const Center(child: CircularProgressIndicator())
-//               : ListView.builder(
-//                 itemCount: products.length,
-//                 itemBuilder: (context, index) {
-//                   final product = products[index];
-//                   return Card(
-//                     margin: const EdgeInsets.all(8),
-//                     child: ListTile(
-//                       leading: Image.network(
-//                         product["image"],
-//                         width: 50,
-//                         height: 50,
-//                         fit: BoxFit.cover,
-//                       ),
-
-//                       title: Column(
-//                         crossAxisAlignment: CrossAxisAlignment.start,
-//                         children: [
-//                           Text(
-//                             product["title"],
-//                             style: const TextStyle(
-//                               fontWeight: FontWeight.bold,
-//                               fontSize: 20,
-//                             ),
-//                           ),
-//                           const SizedBox(height: 6),
-//                           Text(product["description"]),
-//                         ],
-//                       ),
-//                     ),
-//                   );
-//                 },
-//               ),
-//       floatingActionButton: FloatingActionButton(
-//         onPressed: () {
-//           _addProduct();
-//         },
-//         child: Icon(Icons.add),
-//       ),
-//     );
-//   }
-
-//   void _addProduct() {
-//     Navigator.of(context).push(
-//       MaterialPageRoute(
-//         builder: (context) {
-//           return AddProducts();
-//         },
-//       ),
-//     );
-//   }
-// }
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -105,12 +12,32 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late Future<List<ProductResModel>> _productFuture;
+  late Future<List<String>> _categoryFuture;
+  List<ProductResModel> lstProduct = [];
+  List<ProductResModel> _lstSearchProduct = [];
+  bool _isSearch = false;
+  String _searchKeyword = "";
+
+  final TextEditingController searchController = TextEditingController();
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
+    _loadInitialData();
+  }
+
+  void _loadInitialData() {
     _productFuture = ApiHelper.getProduct(context);
+    _categoryFuture = ApiHelper.getAllCategories(context);
+  }
+
+  void _loadByCategory(String category) {
+    setState(() {
+      _isSearch = false;
+      _searchKeyword = "";
+      searchController.clear();
+      _productFuture = ApiHelper.getProductsByCategory(context, category);
+    });
   }
 
   @override
@@ -121,60 +48,184 @@ class _HomePageState extends State<HomePage> {
         backgroundColor: Colors.white,
         elevation: 10,
       ),
-      body: FutureBuilder<List<ProductResModel>>(
-        future: _productFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text("Error occured"));
-          }
-          if (snapshot.data == null && !snapshot.hasData) {
-            return Center(child: Text("no data"));
-          }
-          return Column(
-            children: [
-              TextField(
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  filled: true,
-                  hintText: "Search the products",
-                ),
-              ),
-              SizedBox(height: 10),
-              Expanded(
-                child: GridView.builder(
-                  itemCount: snapshot.data != null ? snapshot.data!.length : 0,
-                  itemBuilder: (context, index) {
-                    if (snapshot.data == null) {
-                      return SizedBox();
-                    }
-                    final product = snapshot.data![index];
-                    return ProductCardReusable(product: product);
-                  },
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 1 / 1.5,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
+      body: _isSearch ? _lstSearchWidget() : _productListWidget(),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           setState(() {
-            _productFuture = ApiHelper.getProduct(context);
+            _isSearch = false;
+            _searchKeyword = "";
+            searchController.clear();
+            _loadInitialData();
           });
         },
         child: Icon(Icons.refresh),
       ),
+    );
+  }
+
+  Widget _lstSearchWidget() {
+    searchController.text = _searchKeyword;
+
+    return Column(
+      children: [
+        _buildSearchBar(showFilterButton: false),
+        SizedBox(height: 20),
+        Expanded(
+          child:
+              _lstSearchProduct.isEmpty
+                  ? Center(child: Text("No products found"))
+                  : GridView.builder(
+                    itemCount: _lstSearchProduct.length,
+                    itemBuilder: (context, index) {
+                      final product = _lstSearchProduct[index];
+                      return ProductCardReusable(product: product);
+                    },
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 1 / 1.5,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                    ),
+                  ),
+        ),
+      ],
+    );
+  }
+
+  Widget _productListWidget() {
+    return FutureBuilder<List>(
+      future: Future.wait([_productFuture, _categoryFuture]),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text("Error occurred"));
+        }
+        if (snapshot.data == null || !snapshot.hasData) {
+          return Center(child: Text("No data"));
+        }
+
+        lstProduct = snapshot.data![0];
+        List<String> categories = snapshot.data![1];
+
+        return Column(
+          children: [
+            _buildSearchBar(showFilterButton: true, categories: categories),
+            SizedBox(height: 20),
+            Expanded(
+              child: GridView.builder(
+                itemCount: lstProduct.length,
+                itemBuilder: (context, index) {
+                  final product = lstProduct[index];
+                  return ProductCardReusable(product: product);
+                },
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 1 / 1.5,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSearchBar({
+    required bool showFilterButton,
+    List<String>? categories,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: searchController,
+              onChanged: (keyword) {
+                setState(() {
+                  _searchKeyword = keyword;
+                  if (keyword.isEmpty) {
+                    _isSearch = false;
+                    _lstSearchProduct = [];
+                  } else {
+                    _isSearch = true;
+                    _lstSearchProduct =
+                        lstProduct
+                            .where(
+                              (product) => product.title.toLowerCase().contains(
+                                keyword.toLowerCase(),
+                              ),
+                            )
+                            .toList();
+                  }
+                });
+              },
+              decoration: InputDecoration(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                filled: true,
+                hintText: "Search the products",
+                fillColor: Colors.grey[200],
+                hintStyle: TextStyle(color: Colors.grey),
+                prefixIcon: Icon(Icons.search, color: Colors.grey),
+              ),
+            ),
+          ),
+          if (showFilterButton) ...[
+            SizedBox(width: 20),
+            GestureDetector(
+              onTap: () {
+                if (categories != null) {
+                  _showCategoryFilter(context, categories);
+                }
+              },
+              child: Container(
+                height: 50,
+                width: 50,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  color: Colors.grey,
+                ),
+                child: Icon(Icons.filter_list, color: Colors.white),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showCategoryFilter(BuildContext ctx, List<String> lstCategories) {
+    showModalBottomSheet(
+      elevation: 10,
+      backgroundColor: Colors.amber,
+      context: ctx,
+      builder:
+          (ctx) => Container(
+            height: 250,
+            color: Colors.white54,
+            alignment: Alignment.center,
+            child: ListView.builder(
+              itemCount: lstCategories.length,
+              itemBuilder: (context, index) {
+                String category = lstCategories[index];
+                return ListTile(
+                  onTap: () {
+                    Navigator.pop(context);
+                    _loadByCategory(category);
+                  },
+                  title: Text(category),
+                  leading: Icon(Icons.shopping_bag_outlined),
+                );
+              },
+            ),
+          ),
     );
   }
 }

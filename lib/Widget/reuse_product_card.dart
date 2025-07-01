@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:ecommerce/model/product.dart';
 import 'package:ecommerce/screen/products/product_detail_screen.dart';
 import 'package:flutter/material.dart';
@@ -23,7 +24,17 @@ class ProductCardReusable extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Image.network(product.image, height: 100, width: 100),
+            // Image.network(product.image, height: 100, width: 100),
+            CachedNetworkImage(
+              height: 100,
+              width: 100,
+              imageUrl: product.image,
+              progressIndicatorBuilder:
+                  (context, url, downloadProgress) => CircularProgressIndicator(
+                    value: downloadProgress.progress,
+                  ),
+              errorWidget: (context, url, error) => Icon(Icons.error),
+            ),
             SizedBox(height: 10),
             Text(
               "${product.title}}",

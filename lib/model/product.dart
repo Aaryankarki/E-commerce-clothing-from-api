@@ -9,7 +9,7 @@ class ProductResModel {
 
   ProductResModel({
     required this.id,
-    required this.title,
+    required this.title,  
     required this.price,
     required this.description,
     required this.category,
